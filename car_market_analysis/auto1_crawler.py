@@ -51,7 +51,7 @@ MEMORY = Memory("./joblib_cache", verbose=0)
     stop=stop_after_attempt(5),
     wait=wait_exponential(multiplier=1, min=4, max=60),
     retry=(retry_if_exception_type(requests.exceptions.RequestException) | 
-           retry_if_result(lambda x: x.status_code == 429))
+           retry_if_result(lambda x: x.get("status_code") == 429))
 )
 def post_request(query):
     response = requests.post(GRAPHQL_ENDPOINT, json=query, headers=HEADERS)
@@ -115,10 +115,10 @@ def crawl(country):
 def save_data(data, country, format='json'):
     df = pd.DataFrame(data)
     if format == 'json':
-        df.to_json(f'{country}_cars.json', orient='records', lines=True)
+        df.to_json(f'data/{country}.json', orient='records', lines=True)
     elif format == 'parquet':
-        df.to_parquet(f'{country}_cars.parquet')
-    logger.info(f'Saved {len(data)} records to {country}_cars.{format}')
+        df.to_parquet(f'data/{country}.parquet')
+    logger.info(f'Saved {len(data)} records to data/{country}.{format}')
 
 # Step 8: Main Function to Initiate Crawling and Saving Data
 @app.command()
