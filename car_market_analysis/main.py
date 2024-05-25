@@ -5,7 +5,7 @@ import pandas as pd
 import typer
 import logging
 from tqdm import tqdm
-from tenacity import retry, stop_after_attempt, wait_exponential, RetryError
+from tenacity import retry, stop_after_attempt, wait_exponential, RetryError, retry_if_exception_type, retry_if_result
 
 # Initialize Typer app
 app = typer.Typer()
@@ -50,13 +50,18 @@ MEMORY = Memory("./joblib_cache", verbose=0)
 @retry(
     stop=stop_after_attempt(5),
     wait=wait_exponential(multiplier=1, min=4, max=60),
-    retry=(tenacity.retry_if_exception_type(requests.exceptions.RequestException) |
-           tenacity.retry_if_result(lambda x: x.status_code == 429))
+    retry=(retry_if_exception_type(requests.exceptions.RequestException) | 
+           retry_if_result(lambda x: x.status_code == 429))
 )
-def fetch_data(query):
+def post_request(query):
     response = requests.post(GRAPHQL_ENDPOINT, json=query, headers=HEADERS)
     response.raise_for_status()
     return response.json()
+
+# Step 4.2: Fetch Data Function with Caching and Retry
+@MEMORY.cache
+def fetch_data(query):  
+    return post_request(query)
 
 # Step 5: Parse API Response Data
 def parse_response(response):
