@@ -1,10 +1,11 @@
 import requests
-import pandas as pd
 from joblib import Memory
 import os
+import pandas as pd
 import typer
 import logging
 from tqdm import tqdm
+from tenacity import retry, stop_after_attempt, wait_exponential, RetryError
 
 # Initialize Typer app
 app = typer.Typer()
@@ -45,9 +46,16 @@ QUERY_TEMPLATE = {
 # Step 4: Setup Joblib Memory for Caching
 MEMORY = Memory("./joblib_cache", verbose=0)
 
-@MEMORY.cache
+# Step 4.1: Define the retry strategy using tenacity
+@retry(
+    stop=stop_after_attempt(5),
+    wait=wait_exponential(multiplier=1, min=4, max=60),
+    retry=(tenacity.retry_if_exception_type(requests.exceptions.RequestException) |
+           tenacity.retry_if_result(lambda x: x.status_code == 429))
+)
 def fetch_data(query):
     response = requests.post(GRAPHQL_ENDPOINT, json=query, headers=HEADERS)
+    response.raise_for_status()
     return response.json()
 
 # Step 5: Parse API Response Data
@@ -66,10 +74,20 @@ def crawl(country):
 
     while True:
         QUERY_TEMPLATE["variables"]["search"]["offset"] = offset
-        response = fetch_data(QUERY_TEMPLATE)
+        try:
+            response = fetch_data(QUERY_TEMPLATE)
+        except RetryError as e:
+            logger.critical(f'Max retries exceeded with error: {e}')
+            break
+        except requests.exceptions.RequestException as e:
+            logger.error(f'Request failed: {e}')
+            break
 
         if 'errors' in response and len(response['errors']) > 0:
-            logger.error(f'Error fetching data: {response["errors"]}')
+            logger.error(f'GraphQL errors found: {response["errors"]}')
+            break
+        elif not response:  # This means a critical failure in `fetch_data`
+            logger.error('Received an empty response after retries. Exiting crawl...')
             break
 
         ads_data = parse_response(response)
