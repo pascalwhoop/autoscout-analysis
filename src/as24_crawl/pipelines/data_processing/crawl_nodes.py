@@ -1,3 +1,4 @@
+import math
 from typing import Any, Dict, List, Tuple
 import pandas as pd
 import requests
@@ -15,40 +16,59 @@ from tqdm import tqdm
 from tqdm.contrib.logging import logging_redirect_tqdm
 from loguru import logger
 from urllib.parse import urlencode
+import itertools
+import logging
+from multiprocessing import Pool
+from datetime import datetime
+from typing import List, Dict, Any
+import pandas as pd
 
 # Directory setup to store cached data
 cache_dir = 'joblib_cache'
 memory = Memory(cache_dir, verbose=0)
 
+logger = logging.getLogger(__name__)
 
+def scrape_job(args):
+    url_template, country, brand_model, year, cache = args
+    results = scrape_autoscout24(url_template, country, brand_model, year, cache=cache)
+    # add brand, model, year, and country to each result
+    for res in results:
+        res['brand'] = brand_model.split("/")[0]
+        res['model'] = brand_model.split("/")[1]
+        res['year'] = year
+        res['country'] = country
 
-def crawl_node(base_url: str, year_range: List[int], url_params: Dict[str,Any], countries: List, brand_model_combinations: List ):
+    return results
+
+def crawl_node(base_url: str, year_range: List[int], url_params: Dict[str, Any], countries: List, brand_model_combinations: List):
     """
-    Main Kedro node to crawl data from autoscout24
+    Main function to crawl data from autoscout24 with multiprocessing.
     """
     all_results = []
 
     # prep URL
-    years = [year for year in range(year_range[0], year_range[1])]
+    years = [year for year in range(year_range[0], year_range[1] + 1)]
 
     params_str = "&".join([f"{key}={value}" for key, value in url_params.items()])
     url_template = f"{base_url}&{params_str}"
     # used to cache-bust
     today = datetime.now().strftime("%Y-%m-%d")
 
-    # loop over all combos
-    for country, brand_model, year in itertools.product(countries, brand_model_combinations, years):
-        logger.info(f"Scraping data for {brand_model} in {country} for year {year}")
+    # Create a list of all combinations of parameters
+    tasks = [
+        (url_template, country, brand_model, year, today)
+        for country, brand_model, year in itertools.product(countries, brand_model_combinations, years)
+    ]
 
-        results = scrape_autoscout24(url_template, country, brand_model, year, cache=today)
-        # add brand, model, year and country to each result
-        for res in results:
-            res['brand'] = brand_model.split("/")[0]
-            res['model'] = brand_model.split("/")[1]
-            res['year'] = year
-            res['country'] = country
-        all_results.extend(results)
-    
+    # Perform multiprocessing
+    with Pool() as pool:
+        for idx, results in enumerate(pool.imap_unordered(scrape_job, tasks)):
+            country, brand_model, year = tasks[idx][1:4]
+            all_results.extend(results)
+            logger.info(f"Scraping completed for {brand_model} in {country} for year {year}. Pages: {math.ceil(len(results)/20)}")
+
+    logger.info(f"Finished crawling {len(all_results)} records.")
     return pd.DataFrame(all_results)
 
 
@@ -143,58 +163,52 @@ def scrape_autoscout24(url_template:str , country: str, brand_model: str, year: 
     seen_ads = set()
     threshold_seen_ad = 0.50  # Stop if more than 50% ads have already been seen
     
-    # Prepare progress bar
-    pbar = tqdm(desc="Processing pages", unit="page")
 
-    with logging_redirect_tqdm():
-        while pagination_next:
-            url = url_template.format(country=country, page=page, brand_model=brand_model, year=year)
-            # logger.debug(f"Fetching URL: {url}")
-            page_html = fetch_page(url)
-            soup = BeautifulSoup(page_html, 'html.parser')
+    while pagination_next:
+        url = url_template.format(country=country, page=page, brand_model=brand_model, year=year)
+        # logger.debug(f"Fetching URL: {url}")
+        page_html = fetch_page(url)
+        soup = BeautifulSoup(page_html, 'html.parser')
 
-            # Parse listings
-            listings = soup.find_all('article', class_='cldt-summary-full-item')
-            if not listings:
-                logger.warning("No listings found. Check selectors or page structure.")
-                logger.warning(f"URL: {url}")
-                pagination_next = False
-                continue
+        # Parse listings
+        listings = soup.find_all('article', class_='cldt-summary-full-item')
+        if not listings:
+            # logger.warning("No listings found. Check selectors or page structure.")
+            # logger.warning(f"URL: {url}")
+            pagination_next = False
+            continue
+    
+        fetched_ads = 0
+        for listing in listings:
+            try:
+                res = listing.find_all('a', re.compile(r'ListItem_title__.*'))
+                assert len(res) == 1, f"Expected 1 title, found {len(res)}"
+                ad_url = res[0]['href']
+                ad_id = ad_url.split("/")[-1]  # Extracting the ad id from the URL
+
+                if ad_id in seen_ads:
+                    fetched_ads += 1
         
-            fetched_ads = 0
-            for listing in listings:
-                try:
-                    res = listing.find_all('a', re.compile(r'ListItem_title__.*'))
-                    assert len(res) == 1, f"Expected 1 title, found {len(res)}"
-                    ad_url = res[0]['href']
-                    ad_id = ad_url.split("/")[-1]  # Extracting the ad id from the URL
-
-                    if ad_id in seen_ads:
-                        fetched_ads += 1
-            
-                    result = parse_listing(listing)
-                    results.append(result)
-            
-            
-                    seen_ads.add(ad_id)
-                except Exception as e:
-                    logger.error(f"Error processing ad: {e}")
-                    logger.error(f"Skipping ad: {listing}")
-                    logger.error(f"Error stack: {traceback.format_exc(limit=2)}")
-            # Check if we should stop pagination
-            if fetched_ads / len(listings) >= threshold_seen_ad:
-                logger.info("Reached threshold of seen ads. Stopping pagination.")
-                break
+                result = parse_listing(listing)
+                results.append(result)
         
-            # Update progress bar
-            pbar.update(1)
-
-            # Find next page URL for pagination
-            next_page = soup.find_all('li', class_='prev-next')[1]
-            if next_page and 'pagination-item--disabled' not in next_page.get('class', []):
-                page += 1
-            else:
-                pagination_next = False
+        
+                seen_ads.add(ad_id)
+            except Exception as e:
+                logger.error(f"Error processing ad: {e}")
+                logger.error(f"Skipping ad: {listing}")
+                logger.error(f"Error stack: {traceback.format_exc(limit=2)}")
+        # Check if we should stop pagination
+        if fetched_ads / len(listings) >= threshold_seen_ad:
+            logger.info("Reached threshold of seen ads. Stopping pagination.")
+            break
+    
+        # Find next page URL for pagination
+        next_page = soup.find_all('li', class_='prev-next')[1]
+        if next_page and 'pagination-item--disabled' not in next_page.get('class', []):
+            page += 1
+        else:
+            pagination_next = False
     return results
 
 

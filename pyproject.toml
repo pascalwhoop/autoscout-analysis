@@ -20,8 +20,68 @@ ipykernel = "^6.29.4"
 loguru = "^0.7.2"
 beautifulsoup4 = "^4.12.3"
 kedro = "^0.19.5"
+ipython = ">=8.10"
+jupyterlab = ">=3.0"
+kedro-datasets = {extras = ["pandas-csvdataset", "pandas-exceldataset", "pandas-parquetdataset", "plotly-plotlydataset", "plotly-jsondataset", "matplotlib-matplotlibwriter"], version = ">=3.0", markers = 'python_version >= "3.9"' }
+kedro-datasets-compat = {extras = ["pandas.CSVDataset", "pandas.ExcelDataset", "pandas.ParquetDataset", "plotly.PlotlyDataset", "plotly.JSONDataset", "matplotlib.MatplotlibWriter"], version = ">=1.0", markers = 'python_version < "3.9"' }
+kedro-telemetry = ">=0.3.1"
+kedro-viz = ">=6.7.0"
+notebook = "*"
+pytest = "~7.2"
+pytest-cov = "~3.0"
+pytest-mock = ">=1.7.1, <2.0"
+ruff = "~0.1.8"
+scikit-learn = "~1.0"
 
+# [build-system]
+# requires = ["poetry-core"]
+# build-backend = "poetry.core.masonry.api"
 
 [build-system]
-requires = ["poetry-core"]
-build-backend = "poetry.core.masonry.api"
+requires = [ "setuptools",]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "as24_crawl"
+readme = "README.md"
+dynamic = [ "dependencies", "version",]
+
+[project.scripts]
+as24-crawl = "as24_crawl.__main__:main"
+
+[tool.kedro]
+package_name = "as24_crawl"
+project_name = "as24_crawl"
+kedro_init_version = "0.19.5"
+tools = [ "Linting", "Testing", "Custom Logging", "Data Structure", "Kedro Viz",]
+example_pipeline = "True"
+source_dir = "src"
+
+[tool.ruff]
+line-length = 120
+show-fixes = true
+select = [ "F", "W", "E", "I", "UP", "PL", "T201",]
+ignore = [ "E501",]
+
+[project.entry-points."kedro.hooks"]
+
+[tool.pytest.ini_options]
+addopts = "--cov-report term-missing --cov src/as24_crawl -ra"
+
+[tool.coverage.report]
+fail_under = 0
+show_missing = true
+exclude_lines = [ "pragma: no cover", "raise NotImplementedError",]
+
+[tool.ruff.format]
+docstring-code-format = true
+
+[tool.setuptools.dynamic.dependencies]
+file = "requirements.txt"
+
+[tool.setuptools.dynamic.version]
+attr = "as24_crawl.__version__"
+
+[tool.setuptools.packages.find]
+where = [ "src",]
+namespaces = false

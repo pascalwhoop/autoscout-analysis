@@ -1,0 +1,3 @@
+crawling_results:
+  type: pandas.JSONDataset
+  filepath: data/01_raw/crawling_results.json

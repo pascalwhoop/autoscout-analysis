@@ -1,0 +1,56 @@
+countries: 
+  - NL
+  - D
+  - I
+year_range: [2010, 2024]
+
+base_url: https://www.autoscout24.de/lst/{brand_model}/ft_benzin?atype=C&cy={country}&page={page}&damaged_listing=exclude&desc=1
+url_params:
+  fuel: B
+  kmto: 250000
+  ocs_listing: include
+  powertype: kw
+  # search_id: n946uue9uo
+  sort: age
+  # source: detailpage_back-to-list
+  # ustate: N%2CU
+  fregfrom: "{year}"
+  fregto: "{year}"
+  pricefrom: 50
+  priceto: 25000
+
+brand_model:
+  - ford/fiesta
+  - ford/focus
+  - ford/mondeo
+  - volkswagen/golf
+  - volkswagen/passat
+  - volkswagen/polo
+  - audi/a3
+  - audi/a4
+  # - audi/a6
+  # - bmw/1er-(alle)
+  # - bmw/3er-(alle)
+  - skoda/fabia
+  - skoda/octavia
+  # - skoda/superb
+  - toyota/auris
+  - toyota/avensis
+  # - mercedes/a-klasse
+  # - mercedes/c-klasse
+  # - mercedes/e-klasse
+  # - honda/civic
+  # - honda/accord
+  # - mazda/3
+  # - mazda/6
+  - peugeot/308
+  - peugeot/508
+  # - renault/megane
+  # - renault/talisman
+  - hyundai/i30
+  - hyundai/i40
+  - kia/ceed
+  - kia/optima
+  - nissan/qashqai
+  - fiat/punto
+  - fiat/500
