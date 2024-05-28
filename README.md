@@ -2,7 +2,8 @@
 
 This project is a simple crawler for the autoscout24 website. It crawls up to 400 cars per brand/model/year combination and stores the data in a versioned directory as parquet. The data is then analyzed and visualized using some simple plots in [my workbench](workbench.py). Note I use vscode for this so it's not a fancy notebook. Feel free to crawl yourself and visualise your own data. Below is an example, more can be found in [the images folder](images/)
 
-![](images/price_vs_mileage_focus.png)
+![](images/price_vs_mileage_fiesta.png)
+![](images/price_vs_mileage_a3.png)
 
 ## Overview
 
