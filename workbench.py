@@ -199,8 +199,8 @@ def plot_price_vs_mileage(df, model_name):
     scatter_plot.grid(True)
 
     # Show plot
-    plt.show()
     plt.savefig(f"images/price_vs_mileage_{model_name}.png")
+    plt.show()
 
 # Example usage
 plot_price_vs_mileage(cleaned_df, 'focus')
