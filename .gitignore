@@ -1,5 +1,7 @@
 data/
 joblib_cache/
+data_old/
+session_store.db
 ##########################
 # KEDRO PROJECT
 

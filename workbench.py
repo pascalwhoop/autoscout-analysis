@@ -200,13 +200,13 @@ def plot_price_vs_mileage(df, model_name):
 
     # Show plot
     plt.show()
+    plt.savefig(f"images/price_vs_mileage_{model_name}.png")
 
 # Example usage
 plot_price_vs_mileage(cleaned_df, 'focus')
 plot_price_vs_mileage(cleaned_df, 'octavia')
 plot_price_vs_mileage(cleaned_df, 'fiesta')
 plot_price_vs_mileage(cleaned_df, 'golf')
-# %%
 plot_price_vs_mileage(cleaned_df, 'ceed')
 plot_price_vs_mileage(cleaned_df, 'a3')
 plot_price_vs_mileage(cleaned_df, '500')
